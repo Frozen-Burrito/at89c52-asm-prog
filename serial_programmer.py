@@ -1,3 +1,4 @@
+import time
 import serial
 
 
@@ -9,14 +10,16 @@ class SerialProgrammer:
         self.ser.port = port
         self.ser.baudrate = bitrate
         self.ser.timeout = 1
-        
+
         self.address_range = address_range
 
     
     def open(self) -> None:
         if self.ser is not None:
-            print("DEBUG: open serial port")
+            print(f"DEBUG: open serial port {self.ser.name}, {self.ser.baudrate}")
             self.ser.open()
+            # Workaround: Arduino Mega appears to reset after open(), wait for reset to complete. 
+            time.sleep(1)
 
 
     def seek(self, address) -> bool:
@@ -39,6 +42,7 @@ class SerialProgrammer:
         checksum = sum(payload) & 0xFF
         payload.append(checksum)
 
+        print(f"Write {bytes(payload)}")
         num_bytes_written = self.ser.write(bytes(payload))
 
         # Check if write sent the complete payload.
@@ -46,7 +50,7 @@ class SerialProgrammer:
             print(f"ERROR: seek tried to write {len(payload)} bytes, but only {num_bytes_written} were written")
             return False
         
-        response = self.ser.read(1)
+        response = self.ser.read(2)
         if response != self.RESPONSE_SUCCESS:
             print(f"ERROR: seek got response {response}")
             return False

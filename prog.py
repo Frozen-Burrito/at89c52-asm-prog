@@ -35,6 +35,7 @@ OPTION_DESCRIPTIONS = {
 ADDRESS_START = 0
 ADDRESS_END = 0xFF
 DEFAULT_PORT = "COM0"
+DEFAULT_BITRATE = 9600
 
 
 def print_help() -> None:
@@ -100,10 +101,11 @@ def memory_write(options: dict) -> None:
     start, end = address_range
     print(f"Write {source_file} from {start} to {end} at port {port}")
 
-    serial_prog = SerialProgrammer(port, 9600, (ADDRESS_START, ADDRESS_END))
+    serial_prog = SerialProgrammer(port, DEFAULT_BITRATE, (ADDRESS_START, ADDRESS_END))
     serial_prog.open()
 
-    serial_prog.seek(start)
+    is_ok = serial_prog.seek(start)
+    print(f"seek ok: {is_ok}")
 
     serial_prog.close()
 
@@ -119,11 +121,11 @@ def memory_read(options) -> None:
 
     print(f"Read {source_file} from {start} to {end} at port {port}")
 
-    
-    serial_prog = SerialProgrammer(port, 115200, (ADDRESS_START, ADDRESS_END))
+    serial_prog = SerialProgrammer(port, DEFAULT_BITRATE, (ADDRESS_START, ADDRESS_END))
     serial_prog.open()
 
-    serial_prog.seek(start)
+    is_ok = serial_prog.seek(start)
+    print(f"seek ok: {is_ok}")
 
     serial_prog.close()
 
