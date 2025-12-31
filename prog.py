@@ -127,6 +127,10 @@ def memory_read(options) -> None:
     is_ok = serial_prog.seek(start)
     print(f"seek ok: {is_ok}")
 
+    if is_ok:
+        data = serial_prog.read()
+        print(f"read data: {data}")
+
     serial_prog.close()
 
 

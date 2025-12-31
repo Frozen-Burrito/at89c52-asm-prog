@@ -5,6 +5,9 @@ import serial
 class SerialProgrammer:
     RESPONSE_SUCCESS = bytes([0xA5, (~0xA5) & 0xFF])
 
+    SEEK_COMMAND = 0x10
+    READ_COMMAND = 0x20
+
     def __init__(self, port: str, bitrate: int, address_range: tuple[int, int]) -> None:
         self.ser = serial.Serial()
         self.ser.port = port
@@ -38,7 +41,7 @@ class SerialProgrammer:
         address_low = address & 0xFF
         address_high = (address >> 8) & 0xFF
 
-        payload = [0x10, (~0x10) & 0xFF, address_high, address_low]
+        payload = [self.SEEK_COMMAND, (~self.SEEK_COMMAND) & 0xFF, address_high, address_low]
         checksum = sum(payload) & 0xFF
         payload.append(checksum)
 
@@ -56,6 +59,33 @@ class SerialProgrammer:
             return False
 
         return True
+
+
+    def read(self) -> int | None:
+        # Serial port must be open.
+        if self.ser is None or not self.ser.is_open:
+            print("ERROR: serial port is not open, call open() first")
+            return None
+        
+        # Write read command
+        payload = [self.READ_COMMAND, (~self.READ_COMMAND) & 0xFF]
+        checksum = sum(payload) & 0xFF
+        payload.append(checksum)
+
+        print(f"DEBUG: send command {bytes(payload)}")
+        num_bytes_written = self.ser.write(bytes(payload))
+
+        # Check if write sent the complete payload.
+        if num_bytes_written != len(payload):
+            print(f"ERROR: read() tried to write {len(payload)} bytes, but only {num_bytes_written} were written")
+            return None
+        
+        response = self.ser.read(4)
+        if len(response) != 4 or response[:2] != self.RESPONSE_SUCCESS or (sum(response[:3]) & 0xFF) != response[-1]:
+            print(f"ERROR: read got response {response}")
+            return None
+        
+        return response[2]
 
     
     def close(self) -> None:
