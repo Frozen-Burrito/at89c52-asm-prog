@@ -115,7 +115,7 @@ def memory_write(options: dict) -> None:
 
 
 def memory_read(options) -> None:
-    source_file = options.get(Option.FILE, "contents.out")
+    output_file = options.get(Option.FILE, None)
     port = options.get(Option.PORT, DEFAULT_PORT)
 
     address_range = options_get_address_range(options)
@@ -123,17 +123,40 @@ def memory_read(options) -> None:
         return
     start, end = address_range
 
-    print(f"Read {source_file} from {start} to {end} at port {port}")
+    print(f"Read from {start} to {end} at port {port} and write to {output_file}")
 
     serial_prog = SerialProgrammer(port, DEFAULT_BITRATE, (ADDRESS_START, ADDRESS_END))
     serial_prog.open()
 
     is_ok = serial_prog.seek(start)
-    print(f"seek ok: {is_ok}")
 
     if is_ok:
-        data = serial_prog.read()
-        print(f"read data: {data}")
+        data = []
+        address = start
+        while address <= end:
+            value = serial_prog.read()
+
+            if value is None:
+                break
+
+            data.append(value)
+            address += 1
+
+        print(f"read {end - start + 1} bytes of data:")
+
+        formatted_data = [bytes(data[i:i+16]).hex(" ") for i in range(0, len(data), 16)]
+
+        if output_file is not None:
+            with open(output_file, "w", encoding="utf-8") as out_f:
+                for line in formatted_data:
+                    out_f.write(line + "\n")
+
+            print(f"wrote memory contents to {output_file}")
+        else:
+            for line in formatted_data:
+                print(line)
+    else:
+        print("memory seek address failed")
 
     serial_prog.close()
 
