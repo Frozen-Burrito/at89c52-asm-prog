@@ -107,6 +107,10 @@ def memory_write(options: dict) -> None:
     is_ok = serial_prog.seek(start)
     print(f"seek ok: {is_ok}")
 
+    if is_ok:
+        is_ok = serial_prog.write(0xF0)
+        print(f"write ok: {is_ok}")
+
     serial_prog.close()
 
 

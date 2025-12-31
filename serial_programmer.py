@@ -7,6 +7,7 @@ class SerialProgrammer:
 
     SEEK_COMMAND = 0x10
     READ_COMMAND = 0x20
+    WRITE_COMMAND = 0x40
 
     def __init__(self, port: str, bitrate: int, address_range: tuple[int, int]) -> None:
         self.ser = serial.Serial()
@@ -86,6 +87,38 @@ class SerialProgrammer:
             return None
         
         return response[2]
+    
+
+    def write(self, data: int) -> bool:
+        # Serial port must be open.
+        if self.ser is None or not self.ser.is_open:
+            print("ERROR: serial port is not open, call open() first")
+            return False
+        
+        # Ensure that data is a byte.
+        if data < 0 or data > 0xFF:
+            print("ERROR: write data must be in range 0 - 255")
+            return False
+        
+        # Send write command
+        payload = [self.WRITE_COMMAND, (~self.WRITE_COMMAND) & 0xFF, data]
+        checksum = sum(payload) & 0xFF
+        payload.append(checksum)
+
+        print(f"DEBUG: send command {bytes(payload)}")
+        num_bytes_written = self.ser.write(bytes(payload))
+
+        # Check if serial wrote the complete payload.
+        if num_bytes_written != len(payload):
+            print(f"ERROR: write() tried to write {len(payload)} bytes, but only {num_bytes_written} were written")
+            return False
+        
+        response = self.ser.read(2)
+        if response != self.RESPONSE_SUCCESS:
+            print(f"ERROR: write() got response {response}")
+            return False
+        
+        return True
 
     
     def close(self) -> None:
