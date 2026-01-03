@@ -12,7 +12,7 @@ class CliConfig:
     def __init__(
             self, 
             executable_name: str, 
-            commands: set[str],
+            commands: set[str] | None,
             num_expected_args: int, 
             options: list[CliOption],
             help_option: CliOption = CliOption("help", "h", False, "show this information and exit")
@@ -27,21 +27,24 @@ class CliConfig:
 def cli_parse_inputs(
         inputs: list[str], 
         cli_config: CliConfig
-) -> tuple[str, list[str], dict[str, object]] | None:
+) -> tuple[str | None, list[str], dict[str, object]] | None:
     command = None
-    if len(inputs) > 0 and inputs[0] in cli_config.commands:
+    if len(inputs) > 0 and cli_config.commands is not None and inputs[0] in cli_config.commands:
         command = inputs[0]
 
     num_positional_args = cli_config.num_expected_args
-    positional_args = inputs[1:num_positional_args] if command is None else inputs[1:1+num_positional_args]
+    positional_args = inputs[:num_positional_args] if command is None else inputs[1:1+num_positional_args]
+    positional_args = [arg for arg in positional_args if not arg.startswith("-")]
 
-    option_strings = inputs[num_positional_args:] if command is None else inputs[1+num_positional_args:]
+    option_strings = inputs[len(positional_args):] if command is None else inputs[1+len(positional_args):]
     options = cli_parse_options(option_strings, cli_config)
 
     if options is not None:
         if len(inputs) == 0 or options.get("help", False) != False:
             cli_print_help(cli_config)
-        elif command is not None:
+        elif len(positional_args) != num_positional_args:
+            print(f"error: expected {num_positional_args} positional argument(s), but got {len(positional_args)}")
+        elif command is not None or cli_config.commands is None:
             return (command, positional_args, options)
         else:
             print(f"error: unknown command {inputs[0]}")
@@ -85,12 +88,16 @@ def cli_parse_options(cli_args: list[str], cli_config: CliConfig) -> dict[str, o
         elif next_value_option is not None:
             parsed_options[next_value_option.name] = arg
             next_value_option = None
+
+    if next_value_option is not None:
+        print(f"error: option {next_value_option.name} expected a value, but received nothing")
+        return None
             
     return parsed_options
 
 
 def cli_print_help(cli_config: CliConfig):
-    command_format = f"[{" | ".join(cli_config.commands)}] " if len(cli_config.commands) > 0 else ""
+    command_format = f"[{" | ".join(cli_config.commands)}] " if cli_config.commands is not None else ""
     options_format = "[options] " if len(cli_config.options) > 0 else ""
     positional_arg_format = "... " if cli_config.num_expected_args > 0 else ""
 
