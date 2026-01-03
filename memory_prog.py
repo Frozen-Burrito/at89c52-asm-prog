@@ -1,10 +1,21 @@
-from cli import CliCommand, cli_parse_inputs
-from option import Option
+from enum import StrEnum
+
+
+from cli import cli_parse_inputs, CliConfig, CliOption
 from serial_programmer import SerialProgrammer
 
 
 ADDRESS_START = 0
 ADDRESS_END = 0xFF
+
+
+class Option(StrEnum):
+    START = "start"
+    END = "end"
+    PORT = "port"
+    FILE = "file"
+
+
 DEFAULT_PORT = "COM0"
 DEFAULT_BITRATE = 9600
 DEFAULT_INPUT_FILE = "a.out"
@@ -117,13 +128,26 @@ def to_int_or_none(address) -> int | None:
 if __name__ == "__main__":
     import sys
 
-    parsed_command = cli_parse_inputs(sys.argv[1:])
+    cli_config = CliConfig(
+        "memory_prog.py", 
+        commands={"read", "write"}, 
+        num_expected_args=0, 
+        options=[
+            CliOption(Option.START.value, "s", True, "set the start memory address to read from or write to. Default is start of address space"),
+            CliOption(Option.END.value, "e", True, "set the end memory address to read from or write to. Default is end of address space"),
+            CliOption(Option.PORT.value, "p", True, "specify the serial port connected to the programmer"),
+            CliOption(Option.FILE.value, None, True, "specify the write input or read output file")
+        ]
+    )
+    
+    parsed_command = cli_parse_inputs(sys.argv[1:], cli_config)
 
     if parsed_command is not None:
-        command, options = parsed_command
+        command, positional_args, options = parsed_command
+        print(options)
 
         match command:
-            case CliCommand.READ:
+            case "read":
                 memory_read(options)
-            case CliCommand.WRITE:
+            case "write":
                 memory_write(options)
