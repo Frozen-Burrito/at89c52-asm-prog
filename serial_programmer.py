@@ -18,13 +18,16 @@ class SerialProgrammer:
         self.address_range = address_range
 
     
-    def open(self) -> None:
+    def open(self):
         if self.ser is not None:
             print(f"DEBUG: open serial port {self.ser.name}, {self.ser.baudrate}")
-            self.ser.open()
-            # Workaround: Arduino Mega appears to reset after open(), wait for reset to complete. 
-            time.sleep(1)
-
+            try:
+                self.ser.open()
+                # Workaround: Arduino Mega appears to reset after open(), wait for reset to complete. 
+                time.sleep(1)
+            except serial.SerialException:
+                print(f"ERROR: could not open port {self.ser.name}")
+            
 
     def seek(self, address) -> bool:
         # Serial port must be open.

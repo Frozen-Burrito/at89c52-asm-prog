@@ -1,7 +1,6 @@
 from enum import StrEnum
 
 
-from cli import cli_parse_inputs, CliConfig, CliOption
 from serial_programmer import SerialProgrammer
 
 
@@ -9,7 +8,7 @@ ADDRESS_START = 0
 ADDRESS_END = 0xFF
 
 
-class Option(StrEnum):
+class MemoryProgOption(StrEnum):
     START = "start"
     END = "end"
     PORT = "port"
@@ -23,15 +22,15 @@ DEFAULT_OUTPUT_FILE = None
 
 
 def memory_write(options: dict) -> None:
-    source_file = options.get(Option, DEFAULT_INPUT_FILE)
-    port = options.get(Option, DEFAULT_PORT)
+    source_file = options.get(MemoryProgOption, DEFAULT_INPUT_FILE)
+    port = options.get(MemoryProgOption, DEFAULT_PORT)
 
     address_range = options_get_address_range(options)
     if address_range is None:
         return
 
     start, end = address_range
-    print(f"Write {source_file} from {start} to {end} at port {port}")
+    print(f"Write {source_file} from 0x{start:02x} to 0x{end:02x} at port {port}")
 
     serial_prog = SerialProgrammer(port, DEFAULT_BITRATE, (ADDRESS_START, ADDRESS_END))
     serial_prog.open()
@@ -47,15 +46,15 @@ def memory_write(options: dict) -> None:
 
 
 def memory_read(options) -> None:
-    output_file = options.get(Option.FILE, DEFAULT_OUTPUT_FILE)
-    port = options.get(Option.PORT, DEFAULT_PORT)
+    output_file = options.get(MemoryProgOption.FILE, DEFAULT_OUTPUT_FILE)
+    port = options.get(MemoryProgOption.PORT, DEFAULT_PORT)
 
     address_range = options_get_address_range(options)
     if address_range is None:
         return
     start, end = address_range
 
-    print(f"Read from {start} to {end} at port {port} and write to {output_file}")
+    print(f"Read from 0x{start:02x} to 0x{end:02x} at port {port} and write to {output_file}")
 
     serial_prog = SerialProgrammer(port, DEFAULT_BITRATE, (ADDRESS_START, ADDRESS_END))
     serial_prog.open()
@@ -94,60 +93,54 @@ def memory_read(options) -> None:
 
 
 def options_get_address_range(options: dict) -> tuple[int, int] | None:
-    start_option_value = options.get(Option.START, ADDRESS_START)
-    start = to_int_or_none(start_option_value)
-     
-    end_option_value = options.get(Option.END, ADDRESS_END)
-    end = to_int_or_none(end_option_value)
+    start = options.get(MemoryProgOption.START)
+    if start is None:
+        start = ADDRESS_START
+
+    end = options.get(MemoryProgOption.END)
+    if end is None:
+        end = ADDRESS_END
 
     address_range = None
-    if start is not None and end is not None:
-        if start <= end:
-            if ADDRESS_START <= start and end <= ADDRESS_END:
-                address_range = (start, end)
-            else:
-                print(f"address must be in range {ADDRESS_START} - {ADDRESS_END}")
+    if start <= end:
+        if ADDRESS_START <= start and end <= ADDRESS_END:
+            address_range = (start, end)
         else:
-            print(f"start address must be before end address")
-    
+            print(f"ERROR: address must be in memory space range 0x{ADDRESS_START:02x} - 0x{ADDRESS_END:02x}")
+    else:
+        print(f"ERROR: start address must be before end address, but {start} > {end}")
+
     return address_range
 
 
-def to_int_or_none(address) -> int | None:
-    is_valid = True
-
-    try:
-        address = int(address)
-    except ValueError:
-        print(f"address must be an integer, not {address}")
-        is_valid = False
-
-    return address if is_valid else None
+def hex_to_decimal(value: str) -> int:
+    if value.startswith("0x"):
+        return int(value, base=16)
+    else:
+        return int(value)
 
 
 if __name__ == "__main__":
-    import sys
+    from argparse import ArgumentParser
 
-    cli_config = CliConfig(
-        "memory_prog.py", 
-        commands={"read", "write"}, 
-        num_expected_args=0, 
-        options=[
-            CliOption(Option.START.value, "s", True, "set the start memory address to read from or write to. Default is start of address space"),
-            CliOption(Option.END.value, "e", True, "set the end memory address to read from or write to. Default is end of address space"),
-            CliOption(Option.PORT.value, "p", True, "specify the serial port connected to the programmer"),
-            CliOption(Option.FILE.value, None, True, "specify the write input or read output file")
-        ]
-    )
-    
-    parsed_command = cli_parse_inputs(sys.argv[1:], cli_config)
+    argument_parser = ArgumentParser(description="read and write to a memory using a serial programmer")
+    argument_parser.add_argument("command", choices=["read", "write"], help="whether to read from or write to memory")
 
-    if parsed_command is not None:
-        command, positional_args, options = parsed_command
-        print(options)
+    argument_parser.add_argument("-s", "--start", type=hex_to_decimal, help="set the start memory address to read from or write to. Default is start of address space")
+    argument_parser.add_argument("-e", "--end", type=hex_to_decimal, help="set the end memory address to read from or write to. Default is end of address space")
+    argument_parser.add_argument("-p", "--port", help="specify the serial port connected to the programmer")
+    argument_parser.add_argument("--file", help="specify the write input or read output file")
 
-        match command:
-            case "read":
-                memory_read(options)
-            case "write":
-                memory_write(options)
+    args = argument_parser.parse_args()
+    options = {
+        MemoryProgOption.START: args.start,
+        MemoryProgOption.END: args.end,
+        MemoryProgOption.PORT: args.port,
+        MemoryProgOption.FILE: args.file
+    }
+
+    match args.command:
+        case "read":
+            memory_read(options)
+        case "write":
+            memory_write(options)

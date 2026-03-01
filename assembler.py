@@ -3,7 +3,6 @@ from enum import StrEnum
 
 from opcode_table import OpcodeTable, OperandType
 from assembler_error import ErrorDetails, ErrorType
-from cli import cli_parse_inputs, CliConfig, CliOption
 
 
 class AssemblerOption(StrEnum):
@@ -21,11 +20,11 @@ opcode_table = OpcodeTable()
 assembler_errors: list[ErrorDetails] = []
 
 
-def assemble_sources(sources: list[str], options: dict[str, object]) -> int:
+def assemble_sources(sources: list[str], options: dict[AssemblerOption, object]) -> int:
     print(sources)
     print(options)
     
-    opcode_table_path = str(options.get(AssemblerOption.OPCODE_TABLE.value, ""))
+    opcode_table_path = str(options.get(AssemblerOption.OPCODE_TABLE, ""))
     
     # Load opcode table from file.
     opcode_table.load_from_file(opcode_table_path)
@@ -160,10 +159,10 @@ def assemble_with_symbols(source_file_path: str) -> list[bytes]:
     return assembled_bytes
 
 
-def write_output(assembled_instructions: list[bytes], options: dict[str, object]):
-    is_hex_format = options.get(AssemblerOption.HEX_FORMAT.value)
+def write_output(assembled_instructions: list[bytes], options: dict[AssemblerOption, object]):
+    is_hex_format = options.get(AssemblerOption.HEX_FORMAT)
     default_file_path = "a.hex" if is_hex_format else "a.out"
-    file_path = str(options.get(AssemblerOption.OUTPUT_FILENAME.value, default_file_path))
+    file_path = str(options.get(AssemblerOption.OUTPUT_FILENAME, default_file_path))
     mode = "w" if is_hex_format else "wb"
     encoding = "utf-8" if is_hex_format else None
 
@@ -394,22 +393,21 @@ def display_error_messages():
 
 if __name__ == "__main__":
     import sys
+    from argparse import ArgumentParser
 
-    cli_config = CliConfig(
-        executable_name="assembler.py",
-        commands=None,
-        num_expected_args=1,
-        options=[
-            CliOption(AssemblerOption.OUTPUT_FILENAME.value, "o", True, "the name of the assembler output file, a.out by default"),
-            CliOption(AssemblerOption.HEX_FORMAT.value, "x", False, "generate a UTF-8 hex file instead of a binary file"),
-            CliOption(AssemblerOption.OPCODE_TABLE.value, "i", True, "specify the opcode table for assembly"),
-        ]
-    )
+    argument_parser = ArgumentParser(description="assemble 8051 source files")
+    argument_parser.add_argument("source", help="8051 assembly source file")
+    argument_parser.add_argument("-o", "--output", help="name of the output file, a.out by default", default="a.out")
+    argument_parser.add_argument("-x", "--hex", help="generate hex output instead of a binary file", action="store_true")
+    argument_parser.add_argument("-i", "--isa", help="specify a CSV with the opcode table")
+    
+    args = argument_parser.parse_args()
+    assembler_options = {
+        AssemblerOption.OUTPUT_FILENAME: args.output,
+        AssemblerOption.HEX_FORMAT: args.hex,
+        AssemblerOption.OPCODE_TABLE: args.isa
+    }
 
-    parsed_inputs = cli_parse_inputs(sys.argv[1:], cli_config)
-    if parsed_inputs is not None:
-        _, positional_args, options = parsed_inputs
+    assembly_status = assemble_sources(sources=[args.source], options=assembler_options)
 
-        assembly_status = assemble_sources(sources=positional_args, options=options)
-
-        sys.exit(assembly_status)
+    sys.exit(assembly_status)
